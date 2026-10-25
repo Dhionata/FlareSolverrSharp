@@ -9,18 +9,40 @@ namespace FlareSolverrSharp.Utilities
     public class SemaphoreLocker
     {
         private static int _maxConcurrency = ResolveInitialConcurrency();
+        private static bool _manuallySet = false;
         private static SemaphoreSlim _semaphore = new SemaphoreSlim(_maxConcurrency, _maxConcurrency);
 
         public static int MaxConcurrency
         {
-            get => _maxConcurrency;
-            set => SetMaxConcurrency(value);
+            get
+            {
+                if (!_manuallySet)
+                {
+                    int currentFromConfig = ResolveInitialConcurrency();
+                    if (currentFromConfig != _maxConcurrency && currentFromConfig > 0)
+                    {
+                        SetMaxConcurrencyInternal(currentFromConfig);
+                    }
+                }
+                return _maxConcurrency;
+            }
+            set
+            {
+                _manuallySet = true;
+                SetMaxConcurrencyInternal(value);
+            }
         }
 
         public static int EstimatedMemoryMb => ConcurrencyAdvisor.EstimateMemoryMb(_maxConcurrency);
         public static string MemoryWarning => ConcurrencyAdvisor.GetMemoryWarning(_maxConcurrency);
 
         public static void SetMaxConcurrency(int concurrency)
+        {
+            _manuallySet = true;
+            SetMaxConcurrencyInternal(concurrency);
+        }
+
+        private static void SetMaxConcurrencyInternal(int concurrency)
         {
             if (concurrency < 1)
                 concurrency = 1;
@@ -36,6 +58,13 @@ namespace FlareSolverrSharp.Utilities
             {
                 Console.WriteLine(warning);
             }
+        }
+
+        public static void ResetToConfig()
+        {
+            _manuallySet = false;
+            int configVal = ResolveInitialConcurrency();
+            SetMaxConcurrencyInternal(configVal);
         }
 
         private static int ResolveInitialConcurrency()
